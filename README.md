@@ -1,5 +1,7 @@
 # pinewood-derby-scheduler
 
+[![Node.js CI](https://github.com/sbma44/pinewood-derby-scheduler/actions/workflows/node.js.yml/badge.svg)](https://github.com/sbma44/pinewood-derby-scheduler/actions/workflows/node.js.yml)
+
 A lane assignment scheduler for pinewood derby races. Generates fair race schedules that maximize lane diversity and opponent variety.
 
 ## Installation
