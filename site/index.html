@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Pinewood Derby Scheduler</title>
+    <link rel="stylesheet" href="./src/style.css" />
+  </head>
+  <body>
+    <main>
+      <h1>Pinewood Derby Scheduler</h1>
+      <p class="subtitle">Generate fair lane assignments for your race</p>
+
+      <form id="scheduler-form">
+        <div class="form-group">
+          <label for="racers">Racer Names (one per line)</label>
+          <textarea
+            id="racers"
+            name="racers"
+            rows="6"
+            placeholder="Lightning McQueen&#10;The King&#10;Chick Hicks&#10;Doc Hudson"
+          ></textarea>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="numLanes">Number of Lanes</label>
+            <input type="number" id="numLanes" name="numLanes" value="4" min="1" max="8" />
+          </div>
+
+          <div class="form-group">
+            <label for="heatsPerRacer">Heats per Racer</label>
+            <input type="number" id="heatsPerRacer" name="heatsPerRacer" value="4" min="1" max="10" />
+          </div>
+        </div>
+
+        <button type="submit">Generate Schedule</button>
+      </form>
+
+      <section id="results" class="hidden">
+        <h2>Race Schedule</h2>
+        <div id="schedule-table"></div>
+      </section>
+    </main>
+
+    <script type="module" src="./src/main.ts"></script>
+  </body>
+</html>
+

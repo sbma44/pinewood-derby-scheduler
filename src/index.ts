@@ -6,6 +6,13 @@ export interface ScheduleOptions {
   numLanes: number;
   /** Number of heats each racer should participate in */
   heatsPerRacer: number;
+  /**
+   * What to prioritize when scheduling:
+   * - 'lanes': Prioritize lane diversity (each racer uses different lanes). Default.
+   * - 'opponents': Prioritize opponent diversity (each racer faces different opponents).
+   * Both are considered; this controls which gets higher weight.
+   */
+  prioritize?: 'lanes' | 'opponents';
 }
 
 /**
@@ -36,7 +43,7 @@ export type Schedule<T> = Heat<T>[];
  * ```
  */
 export function schedule<T>(racers: T[], options: ScheduleOptions): Schedule<T> {
-  const { numLanes, heatsPerRacer } = options;
+  const { numLanes, heatsPerRacer, prioritize = 'lanes' } = options;
 
   // Input validation
   if (!Array.isArray(racers)) {
@@ -53,7 +60,10 @@ export function schedule<T>(racers: T[], options: ScheduleOptions): Schedule<T> 
   }
 
   const totalSlots = racers.length * heatsPerRacer;
-  const numHeats = Math.ceil(totalSlots / numLanes);
+  // Each racer can appear in at most 1 slot per heat
+  // So we need at least heatsPerRacer heats (for each racer to get all their appearances)
+  // And at least ceil(totalSlots / numLanes) heats (to fit all slots)
+  const numHeats = Math.max(heatsPerRacer, Math.ceil(totalSlots / numLanes));
 
   const result: Schedule<T> = [];
   for (let i = 0; i < numHeats; i++) {
@@ -139,76 +149,161 @@ export function schedule<T>(racers: T[], options: ScheduleOptions): Schedule<T> 
   // Helper to check if a slot is a BYE
   const isByeSlot = (heat: number, lane: number) => byeSlots.has(`${heat},${lane}`);
 
+  // Greedy assignment algorithm:
+  // For each heat, select racers that maximize diversity (avoid repeat pairings)
+  // Then assign lanes to maximize lane variety per racer
 
-  // Two-phase assignment:
-  // Phase 1: Determine (heat, position) for each (racer, round) using round-major order
-  // Phase 2: Assign lanes within each heat to maximize lane rotation
+  // Track state for each racer
+  const heatsRemaining = new Array(racers.length).fill(heatsPerRacer);
+  const lanesUsed: Set<number>[] = racers.map(() => new Set());
 
-  // Build list of available slots per heat (excluding BYEs)
-  const heatSlots: number[][] = Array.from({ length: numHeats }, () => []);
+  // Track which pairs have raced together (for diversity)
+  const racedTogether = new Set<string>();
+  const pairKey = (a: number, b: number) => a < b ? `${a},${b}` : `${b},${a}`;
+
+  // Build list of available lanes per heat (excluding BYEs)
+  const availableLanesPerHeat: number[][] = [];
   for (let heat = 0; heat < numHeats; heat++) {
+    const lanes: number[] = [];
     for (let lane = 0; lane < numLanes; lane++) {
       if (!isByeSlot(heat, lane)) {
-        heatSlots[heat].push(lane);
+        lanes.push(lane);
       }
     }
+    availableLanesPerHeat.push(lanes);
   }
 
-  // Phase 1: Collect which racers go in which heat
-  const heatAssignments: { racer: number; round: number }[][] = Array.from(
-    { length: numHeats },
-    () => []
-  );
+  // Process each heat
+  for (let heat = 0; heat < numHeats; heat++) {
+    const slotsInHeat = availableLanesPerHeat[heat].length;
+    const selectedRacers: number[] = [];
 
-  let slotIdx = 0;
-  for (let h = 0; h < heatsPerRacer; h++) {
-    for (let r = 0; r < racers.length; r++) {
-      // Find which heat this slot belongs to
-      let cumulative = 0;
-      for (let heat = 0; heat < numHeats; heat++) {
-        cumulative += heatSlots[heat].length;
-        if (slotIdx < cumulative) {
-          heatAssignments[heat].push({ racer: r, round: h });
-          break;
+    // Greedily select racers for this heat
+    for (let slot = 0; slot < slotsInHeat; slot++) {
+      // Find candidates: racers who still need heats and aren't already in this heat
+      const candidates: number[] = [];
+      for (let r = 0; r < racers.length; r++) {
+        if (heatsRemaining[r] > 0 && !selectedRacers.includes(r)) {
+          candidates.push(r);
         }
       }
-      slotIdx++;
-    }
-  }
 
-  // Phase 2: Assign lanes within each heat with rotation
-  for (let heat = 0; heat < numHeats; heat++) {
-    const assignments = heatAssignments[heat];
-    const availableLanes = [...heatSlots[heat]];
+      if (candidates.length === 0) break;
 
-    // Sort by target lane to minimize conflicts (stable sort by including racer as tiebreaker)
-    assignments.sort((a, b) => {
-      const laneA = (a.racer + a.round) % numLanes;
-      const laneB = (b.racer + b.round) % numLanes;
-      if (laneA !== laneB) return laneA - laneB;
-      return a.racer - b.racer; // Stable tiebreaker
-    });
+      // Score each candidate based on priority mode
+      // Both lane diversity and opponent diversity are considered; priority changes weights
+      let bestCandidate = candidates[0];
+      let bestScore = -Infinity;
 
-    for (const { racer, round } of assignments) {
-      const targetLane = (racer + round) % numLanes;
+      // Get available lanes in this heat for lane scoring
+      const availableLanesNow = availableLanesPerHeat[heat];
 
-      // Try to use target lane if available
-      let assignedLane: number;
-      const targetIdx = availableLanes.indexOf(targetLane);
-      if (targetIdx >= 0) {
-        assignedLane = targetLane;
-        availableLanes.splice(targetIdx, 1);
-      } else if (availableLanes.length > 0) {
-        // Use first available lane
-        assignedLane = availableLanes.shift()!;
-      } else {
-        continue; // No lanes available (shouldn't happen)
+      for (const candidate of candidates) {
+        // Opponent diversity score
+        let newOpponents = 0;
+        let repeatOpponents = 0;
+        for (const alreadySelected of selectedRacers) {
+          if (racedTogether.has(pairKey(candidate, alreadySelected))) {
+            repeatOpponents++;
+          } else {
+            newOpponents++;
+          }
+        }
+
+        // Lane diversity score: count how many available lanes are unused by this racer
+        let unusedLanesAvailable = 0;
+        for (const lane of availableLanesNow) {
+          if (!lanesUsed[candidate].has(lane)) {
+            unusedLanesAvailable++;
+          }
+        }
+        const hasUnusedLane = unusedLanesAvailable > 0 ? 1 : 0;
+
+        // Calculate score based on priority mode
+        let score: number;
+        if (prioritize === 'lanes') {
+          // Lane priority: heavily weight having an unused lane available
+          // Still consider opponents but with lower weight
+          score = hasUnusedLane * 1000 + unusedLanesAvailable * 50
+                + newOpponents * 5 - repeatOpponents * 20
+                + heatsRemaining[candidate];
+        } else {
+          // Opponent priority: heavily weight new opponents, penalize repeats
+          // Still consider lanes but with lower weight
+          score = newOpponents * 10 - repeatOpponents * 100
+                + hasUnusedLane * 20 + unusedLanesAvailable * 2
+                + heatsRemaining[candidate];
+        }
+
+        // Tiebreaker: lower racer index for determinism
+        if (score > bestScore || (score === bestScore && candidate < bestCandidate)) {
+          bestScore = score;
+          bestCandidate = candidate;
+        }
       }
 
-      result[heat][assignedLane] = racers[racer];
+      selectedRacers.push(bestCandidate);
+      heatsRemaining[bestCandidate]--;
+    }
+
+    // Record all pairings from this heat
+    for (let i = 0; i < selectedRacers.length; i++) {
+      for (let j = i + 1; j < selectedRacers.length; j++) {
+        racedTogether.add(pairKey(selectedRacers[i], selectedRacers[j]));
+      }
+    }
+
+    // Assign lanes with rotation preference
+    const availableLanes = [...availableLanesPerHeat[heat]];
+
+    // Sort racers by their preferred lane for stable assignment
+    const racerLanePrefs = selectedRacers.map(r => {
+      // Preferred lane: next lane this racer hasn't used
+      for (let offset = 0; offset < numLanes; offset++) {
+        const tryLane = (r + lanesUsed[r].size + offset) % numLanes;
+        if (!lanesUsed[r].has(tryLane)) {
+          return { racer: r, preferredLane: tryLane };
+        }
+      }
+      // All lanes used, just use rotation
+      return { racer: r, preferredLane: (r + lanesUsed[r].size) % numLanes };
+    });
+
+    // Sort by preferred lane, then racer index for determinism
+    racerLanePrefs.sort((a, b) => {
+      if (a.preferredLane !== b.preferredLane) return a.preferredLane - b.preferredLane;
+      return a.racer - b.racer;
+    });
+
+    for (const { racer, preferredLane } of racerLanePrefs) {
+      let assignedLane: number;
+      const prefIdx = availableLanes.indexOf(preferredLane);
+
+      if (prefIdx >= 0) {
+        assignedLane = preferredLane;
+        availableLanes.splice(prefIdx, 1);
+      } else if (availableLanes.length > 0) {
+        // Find the first available lane this racer hasn't used
+        let foundUnused = false;
+        for (let i = 0; i < availableLanes.length; i++) {
+          if (!lanesUsed[racer].has(availableLanes[i])) {
+            assignedLane = availableLanes[i];
+            availableLanes.splice(i, 1);
+            foundUnused = true;
+            break;
+          }
+        }
+        if (!foundUnused) {
+          assignedLane = availableLanes.shift()!;
+        }
+      } else {
+        continue; // No lanes available
+      }
+
+      result[heat][assignedLane!] = racers[racer];
+      lanesUsed[racer].add(assignedLane!);
     }
   }
 
   return result;
 }
-

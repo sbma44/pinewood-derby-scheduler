@@ -1,0 +1,41 @@
+{
+  "name": "pinewood-derby-scheduler",
+  "version": "0.1.0",
+  "description": "Lane assignment scheduler for pinewood derby races",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup src/index.ts --format esm --dts",
+    "test": "vitest",
+    "test:run": "vitest run",
+    "site:dev": "vite site",
+    "site:build": "vite build site",
+    "site:preview": "vite preview site",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "pinewood-derby",
+    "racing",
+    "scheduler",
+    "lane-assignment"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "tsup": "^8.0.1",
+    "typescript": "^5.3.3",
+    "vite": "^5.0.10",
+    "vitest": "^1.1.3"
+  }
+}
+
