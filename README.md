@@ -1,6 +1,6 @@
 # pinewood-derby-scheduler
 
-A minimal TypeScript library for generating lane assignments for pinewood derby races.
+A lane assignment scheduler for pinewood derby races. Generates fair race schedules that maximize lane diversity and opponent variety.
 
 ## Installation
 
@@ -10,34 +10,39 @@ npm install pinewood-derby-scheduler
 
 ## Usage
 
-```typescript
+```ts
 import { schedule } from 'pinewood-derby-scheduler';
 
-// Define your racers (any object shape works)
+// Define your racers (can be any shape)
 const racers = [
-  { id: 1, name: 'Lightning McQueen' },
-  { id: 2, name: 'The King' },
-  { id: 3, name: 'Chick Hicks' },
-  { id: 4, name: 'Doc Hudson' },
-  { id: 5, name: 'Mater' },
-  { id: 6, name: 'Sally' },
+  { id: 1, name: 'Lightning' },
+  { id: 2, name: 'Thunder' },
+  { id: 3, name: 'Rocket' },
+  { id: 4, name: 'Blaze' },
+  { id: 5, name: 'Storm' },
 ];
 
-// Generate the schedule
+// Generate a schedule
 const raceSchedule = schedule(racers, {
-  numLanes: 4,      // Number of lanes on your track
-  heatsPerRacer: 4, // How many times each racer should race
+  numLanes: 4,      // 4-lane track
+  heatsPerRacer: 3, // each car races 3 times
 });
 
 // raceSchedule is a 2D array: [heat][lane]
-// Each slot contains a racer object or null (empty lane)
+raceSchedule.forEach((heat, i) => {
+  console.log(`Heat ${i + 1}:`, heat.map(r => r?.name ?? '(empty)'));
+});
+```
 
-raceSchedule.forEach((heat, heatIndex) => {
-  console.log(`Heat ${heatIndex + 1}:`);
-  heat.forEach((racer, laneIndex) => {
-    const name = racer ? racer.name : '(empty)';
-    console.log(`  Lane ${laneIndex + 1}: ${name}`);
-  });
+### Prioritizing Opponents Over Lanes
+
+By default, the scheduler prioritizes lane diversity (each racer uses different lanes). You can switch to prioritize opponent diversity instead:
+
+```ts
+const raceSchedule = schedule(racers, {
+  numLanes: 4,
+  heatsPerRacer: 4,
+  prioritize: 'opponents', // maximize unique matchups
 });
 ```
 
@@ -45,47 +50,16 @@ raceSchedule.forEach((heat, heatIndex) => {
 
 ### `schedule<T>(racers: T[], options: ScheduleOptions): Schedule<T>`
 
-Generates a race schedule assigning racers to lanes across multiple heats.
+Generates a race schedule.
 
-#### Parameters
+**Parameters:**
+- `racers` — Array of racer objects (any shape)
+- `options.numLanes` — Number of lanes on the track
+- `options.heatsPerRacer` — How many heats each racer participates in
+- `options.prioritize` — `'lanes'` (default) or `'opponents'`
 
-- `racers` - Array of racer objects (can be any shape)
-- `options.numLanes` - Number of lanes on the track (positive integer)
-- `options.heatsPerRacer` - Number of heats each racer should participate in (positive integer)
-
-#### Returns
-
-A 2D array where `result[heatIndex][laneIndex]` is either a racer object or `null` (for empty lanes).
-
-#### Throws
-
-- If `racers` is not an array or is empty
-- If `numLanes` is not a positive integer
-- If `heatsPerRacer` is not a positive integer
-
-## Development
-
-```bash
-# Install dependencies
-npm install
-
-# Run tests
-npm test
-
-# Run tests once (CI mode)
-npm run test:run
-
-# Build the library
-npm run build
-
-# Start the demo site
-npm run site:dev
-
-# Build the demo site
-npm run site:build
-```
+**Returns:** A 2D array where `result[heatIndex][laneIndex]` is a racer or `null` (empty lane).
 
 ## License
 
 MIT
-
