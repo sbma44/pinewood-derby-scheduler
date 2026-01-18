@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Pinewood Derby Scheduler</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=JetBrains+Mono:wght@400;600&family=Outfit:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <script type="module" crossorigin src="/assets/index-D9N08BCV.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-VVvzmjEo.css">
+  </head>
+  <body>
+    <div class="page-bg"></div>
+    <main>
+      <header class="hero">
+        <p class="hero-emoji">🏎️</p>
+        <h1>Pinewood Derby</h1>
+        <p class="tagline">Race Day Scheduler</p>
+      </header>
+
+      <section class="intro">
+        <p>
+          Paste CSV data (from Google Sheets or Excel) with <strong>Subgroup</strong> and
+          <strong>Car#</strong> columns. The scheduler generates fair lane assignments ensuring
+          every car races the specified number of times.
+        </p>
+      </section>
+
+      <form id="scheduler-form">
+        <div class="form-group">
+          <label for="inputCsv">
+            <span class="label-icon">📋</span>
+            CSV Input
+          </label>
+          <textarea
+            id="inputCsv"
+            name="inputCsv"
+            rows="8"
+            placeholder="Subgroup,Car#,Name&#10;Tigers,101,Lightning Bolt&#10;Tigers,102,Speed Demon&#10;Wolves,201,Thunder Strike&#10;Wolves,202,Night Fury"
+          ></textarea>
+          <p class="help-text">
+            Must include <code>Subgroup</code> and <code>Car#</code> headers. Other columns are ignored.
+          </p>
+        </div>
+
+        <div class="form-row form-row-triple">
+          <div class="form-group">
+            <label for="numLanes">
+              <span class="label-icon">🛣️</span>
+              Lanes
+            </label>
+            <select id="numLanes" name="numLanes"></select>
+          </div>
+
+          <div class="form-group">
+            <label for="heatsPerRacer">
+              <span class="label-icon">🔥</span>
+              Heats per Car
+            </label>
+            <select id="heatsPerRacer" name="heatsPerRacer"></select>
+          </div>
+
+          <div class="form-group">
+            <label for="prioritize">
+              <span class="label-icon">⚡</span>
+              Prioritize
+            </label>
+            <div class="toggle-container">
+              <button type="button" class="toggle-btn active" data-value="lanes">
+                Lane Diversity
+              </button>
+              <button type="button" class="toggle-btn" data-value="opponents">
+                Opponent Diversity
+              </button>
+            </div>
+            <input type="hidden" id="prioritize" name="prioritize" value="lanes" />
+          </div>
+        </div>
+
+        <div class="priority-explanation">
+          <div class="explanation-card" id="lanes-explanation">
+            <strong>Lane Diversity:</strong> Each car races in as many different lanes as possible.
+            Best for tracks where lane speed varies.
+          </div>
+          <div class="explanation-card hidden" id="opponents-explanation">
+            <strong>Opponent Diversity:</strong> Each car faces as many different competitors as possible.
+            Best when lane conditions are consistent.
+          </div>
+        </div>
+
+        <button type="submit" class="submit-btn">
+          🏁 Generate Schedule
+        </button>
+      </form>
+
+      <section id="results" class="hidden">
+        <div class="results-header">
+          <h2>🏁 Race Schedule</h2>
+          <a id="downloadLink" class="download-btn" download="race_schedule.csv">
+            ⬇️ Download CSV
+          </a>
+        </div>
+        <div id="schedule-output"></div>
+      </section>
+    </main>
+
+    <footer>
+      <p>Built with the <a href="https://github.com/your-repo/pinewood-derby-scheduler" target="_blank">pinewood-derby-scheduler</a> library</p>
+    </footer>
+
+  </body>
+</html>
