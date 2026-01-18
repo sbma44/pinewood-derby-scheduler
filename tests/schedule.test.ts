@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { schedule } from '../src/index';
+import { schedule, ScheduleCriterion } from '../src/index';
 
 describe('schedule', () => {
   // Sample racer data for tests
@@ -505,6 +505,282 @@ describe('schedule', () => {
         }
         for (const racer of racers) {
           expect(counts.get(racer.id)).toBe(3);
+        }
+      }
+    });
+
+    it('accepts array of priorities', () => {
+      const racers = makeRacers(16);
+      const priorities: ScheduleCriterion[] = ['turnover', 'opponents', 'lanes'];
+
+      const result = schedule(racers, { numLanes: 4, heatsPerRacer: 4, prioritize: priorities });
+
+      // Should produce a valid schedule
+      expect(result.length).toBeGreaterThan(0);
+
+      // Each racer should appear exactly heatsPerRacer times
+      const counts = new Map<number, number>();
+      for (const heat of result) {
+        for (const slot of heat) {
+          if (slot !== null) {
+            const id = (slot as { id: number }).id;
+            counts.set(id, (counts.get(id) || 0) + 1);
+          }
+        }
+      }
+      for (const racer of racers) {
+        expect(counts.get(racer.id)).toBe(4);
+      }
+    });
+  });
+
+  describe('turnover optimization', () => {
+    /**
+     * Calculate turnover statistics for a schedule.
+     * Turnover = number of cars that appear in both consecutive heats.
+     */
+    function analyzeTurnover(result: ({ id: number } | null)[][]): {
+      totalTurnover: number;
+      avgTurnover: number;
+      maxTurnover: number;
+      minTurnover: number;
+    } {
+      const turnovers: number[] = [];
+
+      for (let i = 1; i < result.length; i++) {
+        const prevHeat = new Set(
+          result[i - 1].filter((r) => r !== null).map((r) => (r as { id: number }).id)
+        );
+        const currentHeat = result[i]
+          .filter((r) => r !== null)
+          .map((r) => (r as { id: number }).id);
+
+        let turnover = 0;
+        for (const id of currentHeat) {
+          if (prevHeat.has(id)) {
+            turnover++;
+          }
+        }
+        turnovers.push(turnover);
+      }
+
+      if (turnovers.length === 0) {
+        return { totalTurnover: 0, avgTurnover: 0, maxTurnover: 0, minTurnover: 0 };
+      }
+
+      return {
+        totalTurnover: turnovers.reduce((a, b) => a + b, 0),
+        avgTurnover: turnovers.reduce((a, b) => a + b, 0) / turnovers.length,
+        maxTurnover: Math.max(...turnovers),
+        minTurnover: Math.min(...turnovers),
+      };
+    }
+
+    it('turnover priority reduces consecutive heat appearances', () => {
+      const racers = makeRacers(24);
+      const numLanes = 4;
+      const heatsPerRacer = 4;
+
+      // Compare turnover-prioritized vs non-turnover-prioritized
+      const resultTurnover = schedule(racers, {
+        numLanes,
+        heatsPerRacer,
+        prioritize: ['turnover', 'lanes', 'opponents'],
+      });
+      const resultLanes = schedule(racers, {
+        numLanes,
+        heatsPerRacer,
+        prioritize: ['lanes', 'opponents', 'turnover'],
+      });
+
+      const statsTurnover = analyzeTurnover(resultTurnover);
+      const statsLanes = analyzeTurnover(resultLanes);
+
+      // Turnover priority should have lower or equal total turnover
+      expect(statsTurnover.totalTurnover).toBeLessThanOrEqual(statsLanes.totalTurnover);
+    });
+
+    it('with turnover priority, consecutive heats have minimal overlap', () => {
+      const racers = makeRacers(20);
+      const numLanes = 4;
+      const heatsPerRacer = 4;
+
+      const result = schedule(racers, {
+        numLanes,
+        heatsPerRacer,
+        prioritize: ['turnover', 'opponents', 'lanes'],
+      });
+
+      const stats = analyzeTurnover(result);
+
+      // With 20 racers and 4 lanes, there are enough racers to avoid overlap in most cases.
+      // Average turnover should be low (ideally 0, but allowing some due to constraints).
+      // With good turnover optimization, average should be less than half the lane count.
+      expect(stats.avgTurnover).toBeLessThan(numLanes / 2);
+    });
+
+    it('turnover statistics can be logged for inspection', () => {
+      const configs = [
+        { racerCount: 16, numLanes: 4, heatsPerRacer: 4 },
+        { racerCount: 24, numLanes: 6, heatsPerRacer: 6 },
+        { racerCount: 50, numLanes: 4, heatsPerRacer: 4 },
+      ];
+
+      for (const { racerCount, numLanes, heatsPerRacer } of configs) {
+        const racers = makeRacers(racerCount);
+
+        const priorities: ScheduleCriterion[][] = [
+          ['lanes', 'opponents', 'turnover'],
+          ['turnover', 'opponents', 'lanes'],
+          ['opponents', 'turnover', 'lanes'],
+        ];
+
+        for (const priority of priorities) {
+          const result = schedule(racers, { numLanes, heatsPerRacer, prioritize: priority });
+          const stats = analyzeTurnover(result);
+
+          console.log(
+            `[${racerCount} racers, ${numLanes} lanes, ${heatsPerRacer} heats/racer, priority=${priority.join('>')}] ` +
+            `Turnover: total=${stats.totalTurnover}, avg=${stats.avgTurnover.toFixed(1)}, ` +
+            `max=${stats.maxTurnover}, min=${stats.minTurnover}`
+          );
+        }
+      }
+
+      expect(true).toBe(true); // Always pass - for inspection
+    });
+
+    it('each racer appears correct number of times with turnover priority', () => {
+      const racers = makeRacers(30);
+      const heatsPerRacer = 5;
+      const result = schedule(racers, {
+        numLanes: 5,
+        heatsPerRacer,
+        prioritize: ['turnover', 'lanes', 'opponents'],
+      });
+
+      const counts = new Map<number, number>();
+      for (const heat of result) {
+        for (const slot of heat) {
+          if (slot !== null) {
+            const id = (slot as { id: number }).id;
+            counts.set(id, (counts.get(id) || 0) + 1);
+          }
+        }
+      }
+
+      for (const racer of racers) {
+        expect(counts.get(racer.id)).toBe(heatsPerRacer);
+      }
+    });
+  });
+
+  describe('priority list ordering', () => {
+    it('different priority orders produce different schedules', () => {
+      const racers = makeRacers(16);
+      const options = { numLanes: 4, heatsPerRacer: 4 };
+
+      const result1 = schedule(racers, { ...options, prioritize: ['lanes', 'opponents', 'turnover'] });
+      const result2 = schedule(racers, { ...options, prioritize: ['turnover', 'opponents', 'lanes'] });
+      const result3 = schedule(racers, { ...options, prioritize: ['opponents', 'lanes', 'turnover'] });
+
+      // Convert to comparable strings
+      const toString = (r: typeof result1) =>
+        r.map((heat) => heat.map((slot) => (slot ? (slot as { id: number }).id : 'X')).join(',')).join('|');
+
+      // At least two of the three should be different
+      const s1 = toString(result1);
+      const s2 = toString(result2);
+      const s3 = toString(result3);
+
+      const uniqueSchedules = new Set([s1, s2, s3]);
+      expect(uniqueSchedules.size).toBeGreaterThanOrEqual(2);
+    });
+
+    it('prioritizing turnover first results in lower turnover than prioritizing lanes first', () => {
+      const racers = makeRacers(32);
+      const numLanes = 4;
+      const heatsPerRacer = 4;
+
+      const resultTurnoverFirst = schedule(racers, {
+        numLanes,
+        heatsPerRacer,
+        prioritize: ['turnover', 'lanes', 'opponents'],
+      });
+      const resultLanesFirst = schedule(racers, {
+        numLanes,
+        heatsPerRacer,
+        prioritize: ['lanes', 'turnover', 'opponents'],
+      });
+
+      // Analyze turnover for both
+      const analyzeTurnover = (result: typeof resultTurnoverFirst) => {
+        let totalTurnover = 0;
+        for (let i = 1; i < result.length; i++) {
+          const prevIds = new Set(
+            result[i - 1].filter((r) => r !== null).map((r) => (r as { id: number }).id)
+          );
+          for (const slot of result[i]) {
+            if (slot !== null && prevIds.has((slot as { id: number }).id)) {
+              totalTurnover++;
+            }
+          }
+        }
+        return totalTurnover;
+      };
+
+      const turnoverFirstTotal = analyzeTurnover(resultTurnoverFirst);
+      const lanesFirstTotal = analyzeTurnover(resultLanesFirst);
+
+      // Turnover-first should be equal or better
+      expect(turnoverFirstTotal).toBeLessThanOrEqual(lanesFirstTotal);
+    });
+
+    it('partial priority list still works (missing criteria get low weight)', () => {
+      const racers = makeRacers(12);
+
+      // Only specify two criteria - third should get minimal weight
+      const result = schedule(racers, {
+        numLanes: 3,
+        heatsPerRacer: 3,
+        prioritize: ['opponents', 'turnover'] as ScheduleCriterion[],
+      });
+
+      // Should still produce a valid schedule
+      const counts = new Map<number, number>();
+      for (const heat of result) {
+        for (const slot of heat) {
+          if (slot !== null) {
+            const id = (slot as { id: number }).id;
+            counts.set(id, (counts.get(id) || 0) + 1);
+          }
+        }
+      }
+      for (const racer of racers) {
+        expect(counts.get(racer.id)).toBe(3);
+      }
+    });
+
+    it('backward compatible: string priority still works', () => {
+      const racers = makeRacers(16);
+
+      // Old-style single string priority should still work
+      const resultLanes = schedule(racers, { numLanes: 4, heatsPerRacer: 4, prioritize: 'lanes' });
+      const resultOpponents = schedule(racers, { numLanes: 4, heatsPerRacer: 4, prioritize: 'opponents' });
+
+      // Both should produce valid schedules
+      for (const result of [resultLanes, resultOpponents]) {
+        const counts = new Map<number, number>();
+        for (const heat of result) {
+          for (const slot of heat) {
+            if (slot !== null) {
+              const id = (slot as { id: number }).id;
+              counts.set(id, (counts.get(id) || 0) + 1);
+            }
+          }
+        }
+        for (const racer of racers) {
+          expect(counts.get(racer.id)).toBe(4);
         }
       }
     });

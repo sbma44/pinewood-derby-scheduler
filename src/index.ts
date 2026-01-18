@@ -1,4 +1,12 @@
 /**
+ * Scheduling criteria that can be prioritized.
+ * - 'lanes': Lane diversity (each racer uses different lanes)
+ * - 'opponents': Opponent diversity (each racer faces different opponents)
+ * - 'turnover': Minimize cars appearing in consecutive heats (faster race setup)
+ */
+export type ScheduleCriterion = 'lanes' | 'opponents' | 'turnover';
+
+/**
  * Options for generating a race schedule.
  */
 export interface ScheduleOptions {
@@ -7,12 +15,21 @@ export interface ScheduleOptions {
   /** Number of heats each racer should participate in */
   heatsPerRacer: number;
   /**
-   * What to prioritize when scheduling:
-   * - 'lanes': Prioritize lane diversity (each racer uses different lanes). Default.
-   * - 'opponents': Prioritize opponent diversity (each racer faces different opponents).
-   * Both are considered; this controls which gets higher weight.
+   * Priority ordering for scheduling criteria.
+   * Can be specified as:
+   * - A single criterion string (backward compatible): 'lanes' | 'opponents'
+   * - An array of criteria in priority order (first = highest priority)
+   *
+   * Default: ['lanes', 'opponents', 'turnover']
+   *
+   * All criteria are always considered; this controls their relative weights.
+   * First criterion gets weight 1000, second gets 100, third gets 10.
+   *
+   * @example
+   * // Prioritize turnover (fast setup), then opponents, then lanes
+   * prioritize: ['turnover', 'opponents', 'lanes']
    */
-  prioritize?: 'lanes' | 'opponents';
+  prioritize?: ScheduleCriterion | ScheduleCriterion[];
 }
 
 /**
@@ -43,7 +60,28 @@ export type Schedule<T> = Heat<T>[];
  * ```
  */
 export function schedule<T>(racers: T[], options: ScheduleOptions): Schedule<T> {
-  const { numLanes, heatsPerRacer, prioritize = 'lanes' } = options;
+  const { numLanes, heatsPerRacer, prioritize = ['lanes', 'opponents', 'turnover'] } = options;
+
+  // Normalize prioritize to an array and calculate weights
+  const priorityList: ScheduleCriterion[] = Array.isArray(prioritize)
+    ? prioritize
+    : prioritize === 'lanes'
+      ? ['lanes', 'opponents', 'turnover']
+      : ['opponents', 'lanes', 'turnover'];
+
+  // Calculate weights based on priority order: first=1000, second=100, third=10
+  const weights: Record<ScheduleCriterion, number> = { lanes: 1, opponents: 1, turnover: 1 };
+  const weightValues = [1000, 100, 10];
+  for (let i = 0; i < priorityList.length; i++) {
+    weights[priorityList[i]] = weightValues[i] ?? 1;
+  }
+  // Assign minimal weight to any criteria not in the list
+  const allCriteria: ScheduleCriterion[] = ['lanes', 'opponents', 'turnover'];
+  for (const criterion of allCriteria) {
+    if (!priorityList.includes(criterion)) {
+      weights[criterion] = 1;
+    }
+  }
 
   // Input validation
   if (!Array.isArray(racers)) {
@@ -161,6 +199,9 @@ export function schedule<T>(racers: T[], options: ScheduleOptions): Schedule<T> 
   const racedTogether = new Set<string>();
   const pairKey = (a: number, b: number) => a < b ? `${a},${b}` : `${b},${a}`;
 
+  // Track racers in the previous heat (for turnover optimization)
+  let previousHeatRacers = new Set<number>();
+
   // Build list of available lanes per heat (excluding BYEs)
   const availableLanesPerHeat: number[][] = [];
   for (let heat = 0; heat < numHeats; heat++) {
@@ -219,21 +260,18 @@ export function schedule<T>(racers: T[], options: ScheduleOptions): Schedule<T> 
         }
         const hasUnusedLane = unusedLanesAvailable > 0 ? 1 : 0;
 
-        // Calculate score based on priority mode
-        let score: number;
-        if (prioritize === 'lanes') {
-          // Lane priority: heavily weight having an unused lane available
-          // Still consider opponents but with lower weight
-          score = hasUnusedLane * 1000 + unusedLanesAvailable * 50
-                + newOpponents * 5 - repeatOpponents * 20
-                + heatsRemaining[candidate];
-        } else {
-          // Opponent priority: heavily weight new opponents, penalize repeats
-          // Still consider lanes but with lower weight
-          score = newOpponents * 10 - repeatOpponents * 100
-                + hasUnusedLane * 20 + unusedLanesAvailable * 2
-                + heatsRemaining[candidate];
-        }
+        // Turnover score: reward candidates NOT in previous heat (faster setup)
+        const wasInPreviousHeat = previousHeatRacers.has(candidate) ? 1 : 0;
+        const turnoverScore = wasInPreviousHeat ? -1 : 1;
+
+        // Calculate score using priority weights
+        // Each criterion contributes based on its weight in the priority list
+        const laneScore = (hasUnusedLane * 10 + unusedLanesAvailable) * weights.lanes;
+        const opponentScore = (newOpponents * 2 - repeatOpponents * 5) * weights.opponents;
+        const turnoverScoreWeighted = turnoverScore * weights.turnover;
+
+        // Combine scores with a small tiebreaker for heatsRemaining
+        const score = laneScore + opponentScore + turnoverScoreWeighted + heatsRemaining[candidate] * 0.1;
 
         // Tiebreaker: lower racer index for determinism
         if (score > bestScore || (score === bestScore && candidate < bestCandidate)) {
@@ -252,6 +290,9 @@ export function schedule<T>(racers: T[], options: ScheduleOptions): Schedule<T> 
         racedTogether.add(pairKey(selectedRacers[i], selectedRacers[j]));
       }
     }
+
+    // Update previous heat racers for turnover tracking
+    previousHeatRacers = new Set(selectedRacers);
 
     // Assign lanes with rotation preference
     const availableLanes = [...availableLanesPerHeat[heat]];
