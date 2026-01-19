@@ -63,32 +63,41 @@
             <select id="heatsPerRacer" name="heatsPerRacer"></select>
           </div>
 
-          <div class="form-group">
-            <label for="prioritize">
-              <span class="label-icon">⚡</span>
-              Prioritize
-            </label>
-            <div class="toggle-container">
-              <button type="button" class="toggle-btn active" data-value="lanes">
-                Lane Diversity
-              </button>
-              <button type="button" class="toggle-btn" data-value="opponents">
-                Opponent Diversity
-              </button>
-            </div>
-            <input type="hidden" id="prioritize" name="prioritize" value="lanes" />
-          </div>
         </div>
 
-        <div class="priority-explanation">
-          <div class="explanation-card" id="lanes-explanation">
-            <strong>Lane Diversity:</strong> Each car races in as many different lanes as possible.
-            Best for tracks where lane speed varies.
+        <div class="form-group priority-section">
+          <label>
+            <span class="label-icon">⚡</span>
+            Priority Order
+            <span class="priority-hint">(drag to reorder)</span>
+          </label>
+          <div id="priority-list" class="priority-list">
+            <div class="priority-item" data-value="lanes" draggable="true">
+              <span class="priority-handle">⠿</span>
+              <span class="priority-rank">1</span>
+              <div class="priority-content">
+                <span class="priority-name">🛣️ Lane Diversity</span>
+                <span class="priority-desc">Each car uses different lanes</span>
+              </div>
+            </div>
+            <div class="priority-item" data-value="opponents" draggable="true">
+              <span class="priority-handle">⠿</span>
+              <span class="priority-rank">2</span>
+              <div class="priority-content">
+                <span class="priority-name">👥 Opponent Diversity</span>
+                <span class="priority-desc">Each car faces different competitors</span>
+              </div>
+            </div>
+            <div class="priority-item" data-value="turnover" draggable="true">
+              <span class="priority-handle">⠿</span>
+              <span class="priority-rank">3</span>
+              <div class="priority-content">
+                <span class="priority-name">🔄 Fast Turnover</span>
+                <span class="priority-desc">Minimize cars in consecutive heats</span>
+              </div>
+            </div>
           </div>
-          <div class="explanation-card hidden" id="opponents-explanation">
-            <strong>Opponent Diversity:</strong> Each car faces as many different competitors as possible.
-            Best when lane conditions are consistent.
-          </div>
+          <input type="hidden" id="prioritize" name="prioritize" value="lanes,opponents,turnover" />
         </div>
 
         <button type="submit" class="submit-btn">

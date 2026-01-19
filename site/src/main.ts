@@ -1,4 +1,4 @@
-import { schedule, type ScheduleOptions } from 'pinewood-derby-scheduler';
+import { schedule, type ScheduleOptions, type ScheduleCriterion } from 'pinewood-derby-scheduler';
 import './style.css';
 
 interface Racer {
@@ -35,29 +35,92 @@ function initDropdowns(): void {
   }
 }
 
-// Set up priority toggle buttons
-function initToggle(): void {
-  const toggleBtns = document.querySelectorAll('.toggle-btn');
+// Set up priority list drag-and-drop
+function initPriorityList(): void {
+  const list = document.getElementById('priority-list') as HTMLElement;
   const hiddenInput = document.getElementById('prioritize') as HTMLInputElement;
-  const lanesExplanation = document.getElementById('lanes-explanation') as HTMLElement;
-  const opponentsExplanation = document.getElementById('opponents-explanation') as HTMLElement;
+  let draggedItem: HTMLElement | null = null;
 
-  toggleBtns.forEach((btn) => {
-    btn.addEventListener('click', () => {
-      toggleBtns.forEach((b) => b.classList.remove('active'));
-      btn.classList.add('active');
-      const value = (btn as HTMLButtonElement).dataset.value as 'lanes' | 'opponents';
-      hiddenInput.value = value;
-
-      // Toggle explanation cards
-      if (value === 'lanes') {
-        lanesExplanation.classList.remove('hidden');
-        opponentsExplanation.classList.add('hidden');
-      } else {
-        lanesExplanation.classList.add('hidden');
-        opponentsExplanation.classList.remove('hidden');
-      }
+  function updateHiddenInput(): void {
+    const items = list.querySelectorAll('.priority-item');
+    const values: string[] = [];
+    items.forEach((item, index) => {
+      values.push((item as HTMLElement).dataset.value as string);
+      // Update rank numbers
+      const rankEl = item.querySelector('.priority-rank');
+      if (rankEl) rankEl.textContent = String(index + 1);
     });
+    hiddenInput.value = values.join(',');
+  }
+
+  function handleDragStart(e: DragEvent): void {
+    draggedItem = e.target as HTMLElement;
+    draggedItem.classList.add('dragging');
+    if (e.dataTransfer) {
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/html', draggedItem.innerHTML);
+    }
+  }
+
+  function handleDragEnd(): void {
+    if (draggedItem) {
+      draggedItem.classList.remove('dragging');
+      draggedItem = null;
+    }
+    list.querySelectorAll('.priority-item').forEach((item) => {
+      item.classList.remove('drag-over');
+    });
+    updateHiddenInput();
+  }
+
+  function handleDragOver(e: DragEvent): void {
+    e.preventDefault();
+    if (e.dataTransfer) {
+      e.dataTransfer.dropEffect = 'move';
+    }
+  }
+
+  function handleDragEnter(e: DragEvent): void {
+    const target = (e.target as HTMLElement).closest('.priority-item') as HTMLElement;
+    if (target && target !== draggedItem) {
+      target.classList.add('drag-over');
+    }
+  }
+
+  function handleDragLeave(e: DragEvent): void {
+    const target = (e.target as HTMLElement).closest('.priority-item') as HTMLElement;
+    if (target) {
+      target.classList.remove('drag-over');
+    }
+  }
+
+  function handleDrop(e: DragEvent): void {
+    e.preventDefault();
+    const target = (e.target as HTMLElement).closest('.priority-item') as HTMLElement;
+    if (target && draggedItem && target !== draggedItem) {
+      const items = Array.from(list.querySelectorAll('.priority-item'));
+      const draggedIndex = items.indexOf(draggedItem);
+      const targetIndex = items.indexOf(target);
+
+      if (draggedIndex < targetIndex) {
+        target.after(draggedItem);
+      } else {
+        target.before(draggedItem);
+      }
+    }
+    list.querySelectorAll('.priority-item').forEach((item) => {
+      item.classList.remove('drag-over');
+    });
+  }
+
+  // Add event listeners to each item
+  list.querySelectorAll('.priority-item').forEach((item) => {
+    item.addEventListener('dragstart', handleDragStart as EventListener);
+    item.addEventListener('dragend', handleDragEnd);
+    item.addEventListener('dragover', handleDragOver as EventListener);
+    item.addEventListener('dragenter', handleDragEnter as EventListener);
+    item.addEventListener('dragleave', handleDragLeave as EventListener);
+    item.addEventListener('drop', handleDrop as EventListener);
   });
 }
 
@@ -229,7 +292,8 @@ function handleSubmit(e: Event): void {
   const csvText = formData.get('inputCsv') as string;
   const numLanes = parseInt(formData.get('numLanes') as string, 10);
   const heatsPerRacer = parseInt(formData.get('heatsPerRacer') as string, 10);
-  const prioritize = formData.get('prioritize') as 'lanes' | 'opponents';
+  const prioritizeStr = formData.get('prioritize') as string;
+  const prioritize = prioritizeStr.split(',') as ScheduleCriterion[];
 
   // Validate input
   if (!csvText.trim()) {
@@ -285,7 +349,7 @@ function handleSubmit(e: Event): void {
 // Initialize the app
 function init(): void {
   initDropdowns();
-  initToggle();
+  initPriorityList();
 
   const form = document.getElementById('scheduler-form') as HTMLFormElement;
   form.addEventListener('submit', handleSubmit);
