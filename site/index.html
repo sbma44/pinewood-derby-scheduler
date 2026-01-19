@@ -80,24 +80,24 @@
                 <span class="priority-desc">Each car uses different lanes</span>
               </div>
             </div>
-            <div class="priority-item" data-value="opponents" draggable="true">
-              <span class="priority-handle">⠿</span>
-              <span class="priority-rank">2</span>
-              <div class="priority-content">
-                <span class="priority-name">👥 Opponent Diversity</span>
-                <span class="priority-desc">Each car faces different competitors</span>
-              </div>
-            </div>
             <div class="priority-item" data-value="turnover" draggable="true">
               <span class="priority-handle">⠿</span>
-              <span class="priority-rank">3</span>
+              <span class="priority-rank">2</span>
               <div class="priority-content">
                 <span class="priority-name">🔄 Fast Turnover</span>
                 <span class="priority-desc">Minimize cars in consecutive heats</span>
               </div>
             </div>
+            <div class="priority-item" data-value="opponents" draggable="true">
+              <span class="priority-handle">⠿</span>
+              <span class="priority-rank">3</span>
+              <div class="priority-content">
+                <span class="priority-name">👥 Opponent Diversity</span>
+                <span class="priority-desc">Each car faces different competitors</span>
+              </div>
+            </div>
           </div>
-          <input type="hidden" id="prioritize" name="prioritize" value="lanes,opponents,turnover" />
+          <input type="hidden" id="prioritize" name="prioritize" value="lanes,turnover,opponents" />
         </div>
 
         <button type="submit" class="submit-btn">

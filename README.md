@@ -66,7 +66,7 @@ const raceSchedule = schedule(racers, {
 const raceSchedule = schedule(racers, {
   numLanes: 4,
   heatsPerRacer: 4,
-  prioritize: ['lanes', 'opponents', 'turnover'],
+  prioritize: ['lanes', 'turnover', 'opponents'],
 });
 ```
 
@@ -88,11 +88,11 @@ The old single-string format still works:
 ```ts
 // These are equivalent:
 prioritize: 'lanes'
-prioritize: ['lanes', 'opponents', 'turnover']
+prioritize: ['lanes', 'turnover', 'opponents']
 
 // These are equivalent:
 prioritize: 'opponents'
-prioritize: ['opponents', 'lanes', 'turnover']
+prioritize: ['opponents', 'turnover', 'lanes']
 ```
 
 ## API
@@ -107,8 +107,8 @@ Generates a race schedule.
 - `options.heatsPerRacer` — How many heats each racer participates in
 - `options.prioritize` — Priority order for scheduling criteria
   - Single criterion: `'lanes'` | `'opponents'` (backward compatible)
-  - Array of criteria: `['lanes', 'opponents', 'turnover']` (any order)
-  - Default: `['lanes', 'opponents', 'turnover']`
+  - Array of criteria: `['lanes', 'turnover', 'opponents']` (any order)
+  - Default: `['lanes', 'turnover', 'opponents']`
 
 **Returns:** A 2D array where `result[heatIndex][laneIndex]` is a racer or `null` (empty lane).
 

@@ -20,7 +20,7 @@ export interface ScheduleOptions {
    * - A single criterion string (backward compatible): 'lanes' | 'opponents'
    * - An array of criteria in priority order (first = highest priority)
    *
-   * Default: ['lanes', 'opponents', 'turnover']
+   * Default: ['lanes', 'turnover', 'opponents']
    *
    * All criteria are always considered; this controls their relative weights.
    * First criterion gets weight 1000, second gets 100, third gets 10.
@@ -60,14 +60,14 @@ export type Schedule<T> = Heat<T>[];
  * ```
  */
 export function schedule<T>(racers: T[], options: ScheduleOptions): Schedule<T> {
-  const { numLanes, heatsPerRacer, prioritize = ['lanes', 'opponents', 'turnover'] } = options;
+  const { numLanes, heatsPerRacer, prioritize = ['lanes', 'turnover', 'opponents'] } = options;
 
   // Normalize prioritize to an array and calculate weights
   const priorityList: ScheduleCriterion[] = Array.isArray(prioritize)
     ? prioritize
     : prioritize === 'lanes'
-      ? ['lanes', 'opponents', 'turnover']
-      : ['opponents', 'lanes', 'turnover'];
+      ? ['lanes', 'turnover', 'opponents']
+      : ['opponents', 'turnover', 'lanes'];
 
   // Calculate weights based on priority order: first=1000, second=100, third=10
   const weights: Record<ScheduleCriterion, number> = { lanes: 1, opponents: 1, turnover: 1 };
