@@ -4,6 +4,8 @@
 
 A lane assignment scheduler for pinewood derby races. Generates fair race schedules that maximize lane diversity and opponent variety.
 
+Live demo: [https://pinewood.tomlee.space](https://pinewood.tomlee.space/)
+
 ## Installation
 
 ```bash
