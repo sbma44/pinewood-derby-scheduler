@@ -1,6 +1,6 @@
 {
   "name": "pinewood-derby-scheduler",
-  "version": "1.0.2",
+  "version": "1.1.0",
   "description": "Lane assignment scheduler for pinewood derby races",
   "type": "module",
   "main": "./dist/index.js",
